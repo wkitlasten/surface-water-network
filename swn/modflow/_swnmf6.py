@@ -1231,7 +1231,7 @@ class SwnMf6(SwnModflowBase):
                             if top[rdf.loc[r,'ij']]<rdf.loc[r,'rtp']:
                                 top[rdf.loc[r,'ij']]=rdf.loc[r,'rtp']+minincise
                             # bump bottoms down if needed
-                            maxbot=rdf.loc[r,'rtp']--buffer
+                            maxbot=rdf.loc[r,'rtp']-buffer
                             if botm[0][rdf.loc[r,'ij']]>=maxbot:
                                 botdz=botm[0][rdf.loc[r,'ij']]-maxbot
                                 for b in range(0,botm.shape[0]):
@@ -1243,7 +1243,8 @@ class SwnMf6(SwnModflowBase):
             else:
                 print('{} changed in loop {}'.format(chg,loop))
         setattr(self,'reaches',rdf[icols])
-
+        self.model.dis.botm=botm
+        self.model.dis.top=top
 
     def fix_reach_elevs(self, minslope=0.0001, minincise=0.2, minthick=0.5, buffer=0.1,
                         fix_dis=True, direction='downstream', segbyseg=False,
