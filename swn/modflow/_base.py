@@ -778,7 +778,7 @@ class SwnModflowBase(object):
             raise ValueError("'array' must have shape (nrow, ncol)")
         self.reaches.loc[:, name] = array[self.reaches["i"], self.reaches["j"]]
 
-    def set_reach_slope(self, method: str = "auto", min_slope=1./1000):
+    def set_reach_slope(self, method: str = "auto", min_slope=1./1000, max_slope=50./1000):
         """Set slope for reaches.
 
         This method also adds/updates several attributes for reaches.
@@ -800,6 +800,10 @@ class SwnModflowBase(object):
             a global value, otherwise it is per-segment with a Series.
             Default 1./1000 (or 0.001). Diversions (if present) will use the
             minimum of series.
+        max_slope : float or pandas.Series, optional
+            Maximum downwards slope imposed on segments. If float, then this is
+            a global value, otherwise it is per-segment with a Series.
+            Default 50./1000 (or 0.05). See Jarrett 1985 or other lit.
         """
         has_z = self._swn.has_z
         supported_methods = ["auto", "zcoord_ab", "grid_top","rch_len"]
@@ -826,11 +830,16 @@ class SwnModflowBase(object):
             "setting reaches['%s'] with %s method", grid_name, method)
         rchs = self.reaches
         rchs["min_slope"] = np.nan
+        rchs["max_slope"] = np.nan
         self.set_reach_data_from_segments("min_slope", min_slope)
+        self.set_reach_data_from_segments("max_slope", max_slope)
         # with diversions, these reaches will be NaN, so set to min
         sel = rchs.min_slope.isna()
         if sel.any():
             rchs.loc[sel, "min_slope"] = rchs.min_slope[~sel].min()
+        sel = rchs.max_slope.isna()
+        if sel.any():
+            rchs.loc[sel, "max_slope"] = rchs.max_slope[~sel].max()
         rchs[grid_name] = 0.0
         if method == "zcoord_ab":
             def get_zcoords(g):
@@ -883,7 +892,7 @@ class SwnModflowBase(object):
             grid_dz = np.sqrt((px*col_size) ** 2 + (py*row_size) ** 2)
             self.reaches.loc[:,grid_name]= \
                 grid_dz[self.reaches['i'],self.reaches['j']]/self.reaches['rlen']
-        # Enforce min_slope when less than min_slop or is NaN
+        # Enforce min_slope when less than min_slope or is NaN
         sel = (rchs[grid_name] < rchs["min_slope"]) | rchs[grid_name].isna()
         if sel.any():
             num = sel.sum()
@@ -891,6 +900,14 @@ class SwnModflowBase(object):
                 "enforcing min_slope for %d reache%s (%.2f%%)",
                 num, "" if num == 1 else "s", 100.0 * num / len(sel))
             rchs.loc[sel, grid_name] = rchs.loc[sel, "min_slope"]
+        # Enforce max_slope when greater than max_slope or is NaN
+        sel = (rchs[grid_name] > rchs["max_slope"]) | rchs[grid_name].isna()
+        if sel.any():
+            num = sel.sum()
+            self.logger.warning(
+                "enforcing max_slope for %d reache%s (%.2f%%)",
+                num, "" if num == 1 else "s", 100.0 * num / len(sel))
+            rchs.loc[sel, grid_name] = rchs.loc[sel, "max_slope"]
 
     def _get_segments_inflow(self, data):
         """Get inflow data by gathering external flow upstream of the model.
