@@ -1131,9 +1131,37 @@ class SwnMf6(SwnModflowBase):
                 laythick[thincells] = minthick
                 layerbots[k + 1] = layerbots[k] - laythick
             self.model.dis.botm.set_data(layerbots)
+            
+    def adjust_bottoms(self,buffer=0.1):
+        # now adjust layering if necessary
+        # include ALL reaches, not just chglist (remove chglist variable all together?)
+        top=self.model.dis.top.array.copy()
+        botm=self.model.dis.botm.array.copy()
+        rdf=self.reaches
+        rdf['ij']=rdf.apply(lambda x: (int(x['i']),int(x['j'])),axis=1)
+       
+        #print('adjusting layers for {} reaches'.format(len(chglist)))
+        chg=0
+        for r in rdf.index:                            
+            # bump top elev up to rtp+incise if need be
+            if top[rdf.loc[r,'ij']]<rdf.loc[r,'rtp']+rdf.loc[r,'incise']:
+                top[rdf.loc[r,'ij']]=rdf.loc[r,'rtp']+rdf.loc[r,'incise']
+            # bump bottoms down if needed
+            # thin layer conundrum... 
+            maxbot=rdf.loc[r,'rtp']-rdf.loc[r,'rbth']-buffer
+            #print(r,botm[0][rdf.loc[r,'ij']],rdf.loc[r,'rtp'],rdf.loc[r,'rbth'],buffer,maxbot)
+            if botm[0][rdf.loc[r,'ij']]>maxbot:
+                chg=chg+1
+                botdz=botm[0][rdf.loc[r,'ij']]-maxbot
+                for b in range(0,botm.shape[0]):
+                    botm[b][rdf.loc[r,'ij']]=botm[b][rdf.loc[r,'ij']]-botdz
+        print('changed bottom elevations for {} reaches'.format(chg))
+        self.model.dis.botm.set_data(botm)
+        self.model.dis.top.set_data(top)
+
 
     def _to_rno_elevs(self, minslope=0.0001, minincise=0.2, minthick=0.5,
-                            buffer=0.5, fix_dis=True):
+                            buffer=0.1, fix_dis=True):
         """
         Wes's hacky attempt to set reach elevations. Doesn't really ensure anything,
         but the goal is:
@@ -1172,12 +1200,11 @@ class SwnMf6(SwnModflowBase):
         """
 
         # copy some data
-        top=self.model.dis.top.array.copy()
-        botm=self.model.dis.botm.array.copy()
         delr=self.model.dis.delr.data.copy()
         delc=self.model.dis.delc.data.copy()
         rdf=self.reaches.copy()
         icols=rdf.columns.to_list()
+        top=self.model.dis.top.data.copy()
         
 
         # add some columns to rdf
@@ -1228,31 +1255,16 @@ class SwnMf6(SwnModflowBase):
                         # move downstream
                         rno=trno
                         trno=rdf.loc[rno,'to_rno']
-                        dz=rdf.loc[rno,'mindz']
-                        
-                    # now adjust layering if necessary
-                    if len(chglist)>0 and fix_dis:
-                        # print('adjusting top for {} reaches'.format(len(chglist)))
-                        for r in chglist:                            
-                            # bump top elev up to rtp+incise if need be
-                            if top[rdf.loc[r,'ij']]<rdf.loc[r,'rtp']+rdf.loc[r,'incise']:
-                                top[rdf.loc[r,'ij']]=rdf.loc[r,'rtp']+rdf.loc[r,'incise']
-                            # bump bottoms down if needed
-                            maxbot=rdf.loc[r,'rtp']-rdf.loc[r,'rbth']-buffer
-                            if botm[0][rdf.loc[r,'ij']]>=maxbot:
-                                botdz=botm[0][rdf.loc[r,'ij']]-maxbot
-                                for b in range(0,botm.shape[0]):
-                                    botm[b][rdf.loc[r,'ij']]=botm[b][rdf.loc[r,'ij']]-botdz
-                                
+                        dz=rdf.loc[rno,'mindz']                                         
                 chg=chg+len(chglist)
             if chg==0:
                 cont=False
             else:
                 print('{} changed in loop {}'.format(chg,loop))
         setattr(self,'reaches',rdf[icols+['to_rtp','mindz']])
-        self.model.dis.botm.set_data(botm)
-        self.model.dis.top.set_data(top)
-
+        if fix_dis:
+            self.adjust_bottoms(buffer=buffer)
+            
     def fix_reach_elevs(self, minslope=0.0001, minincise=0.2, minthick=0.5, buffer=0.1,
                         fix_dis=True, direction='downstream', segbyseg=False,
                         to_rno_elevs=False):
