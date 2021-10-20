@@ -4,11 +4,12 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
     <title>swn.SurfaceWaterNetwork.catchments &#8212; Surface water network 2019 documentation</title>
     
-  <link href="../_static/css/theme.css" rel="stylesheet" />
-  <link href="../_static/css/index.c5995385ac14fb8791e8eb36b4908be2.css" rel="stylesheet" />
+  <link href="../_static/css/theme.css" rel="stylesheet">
+  <link href="../_static/css/index.ff1ffe594081f20da1ef19478df9384b.css" rel="stylesheet">
 
     
   <link rel="stylesheet"
@@ -23,10 +24,10 @@
 
     
     <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
-    <link rel="stylesheet" type="text/css" href="../_static/basic.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/blank.css" />
     <link rel="stylesheet" type="text/css" href="../_static/plot_directive.css" />
     
-  <link rel="preload" as="script" href="../_static/js/index.1c5a1a01449ed65a7b51.js">
+  <link rel="preload" as="script" href="../_static/js/index.be7d3bbb2ef33a8344ce.js">
 
     <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
     <script src="../_static/jquery.js"></script>
@@ -37,7 +38,10 @@
     <link rel="next" title="swn.SurfaceWaterNetwork.diversions" href="swn.SurfaceWaterNetwork.diversions.html" />
     <link rel="prev" title="swn.SurfaceWaterNetwork.segments" href="swn.SurfaceWaterNetwork.segments.html" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="docsearch:language" content="en" />
+    <meta name="docsearch:language" content="None">
+    
+
+    <!-- Google Analytics -->
     
   </head>
   <body data-spy="scroll" data-target="#bd-toc-nav" data-offset="80">
@@ -445,7 +449,7 @@
               
               <div>
                 
-  <div class="section" id="swn-surfacewaternetwork-catchments">
+  <section id="swn-surfacewaternetwork-catchments">
 <h1>swn.SurfaceWaterNetwork.catchments<a class="headerlink" href="#swn-surfacewaternetwork-catchments" title="Permalink to this headline">¶</a></h1>
 <dl class="py property">
 <dt class="sig sig-object py" id="swn.SurfaceWaterNetwork.catchments">
@@ -454,20 +458,58 @@
 <p>Catchment polygons are optional, and are set with a GeoSeries with
 a matching index to <code class="docutils literal notranslate"><span class="pre">segments.index</span></code>.</p>
 <p>To unset this property, use <code class="docutils literal notranslate"><span class="pre">n.catchments</span> <span class="pre">=</span> <span class="pre">None</span></code>.</p>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">swn</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">swn.spatial</span> <span class="kn">import</span> <span class="n">wkt_to_geoseries</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">lines</span> <span class="o">=</span> <span class="n">wkt_to_geoseries</span><span class="p">([</span>
+<span class="gp">... </span>   <span class="s2">&quot;LINESTRING (60 100, 60  80)&quot;</span><span class="p">,</span>
+<span class="gp">... </span>   <span class="s2">&quot;LINESTRING (40 130, 60 100)&quot;</span><span class="p">,</span>
+<span class="gp">... </span>   <span class="s2">&quot;LINESTRING (70 130, 60 100)&quot;</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">lines</span><span class="o">.</span><span class="n">index</span> <span class="o">+=</span> <span class="mi">100</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">polygons</span> <span class="o">=</span> <span class="n">wkt_to_geoseries</span><span class="p">([</span>
+<span class="gp">... </span>   <span class="s2">&quot;POLYGON ((35 100, 75 100, 75  80, 35  80, 35 100))&quot;</span><span class="p">,</span>
+<span class="gp">... </span>   <span class="s2">&quot;POLYGON ((35 135, 60 135, 60 100, 35 100, 35 135))&quot;</span><span class="p">,</span>
+<span class="gp">... </span>   <span class="s2">&quot;POLYGON ((60 135, 75 135, 75 100, 60 100, 60 135))&quot;</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">polygons</span><span class="o">.</span><span class="n">index</span> <span class="o">+=</span> <span class="mi">100</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">n</span> <span class="o">=</span> <span class="n">swn</span><span class="o">.</span><span class="n">SurfaceWaterNetwork</span><span class="o">.</span><span class="n">from_lines</span><span class="p">(</span><span class="n">lines</span><span class="p">,</span> <span class="n">polygons</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">n</span>
+<span class="go">&lt;SurfaceWaterNetwork: with catchment polygons</span>
+<span class="go">  3 segments: [100, 101, 102]</span>
+<span class="go">  2 headwater: [101, 102]</span>
+<span class="go">  1 outlets: [100]</span>
+<span class="go">  no diversions /&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">n</span><span class="o">.</span><span class="n">segments</span><span class="p">[[</span><span class="s2">&quot;to_segnum&quot;</span><span class="p">,</span> <span class="s2">&quot;from_segnums&quot;</span><span class="p">,</span> <span class="s2">&quot;upstream_area&quot;</span><span class="p">,</span> <span class="s2">&quot;width&quot;</span><span class="p">]]</span>
+<span class="go">     to_segnum from_segnums  upstream_area     width</span>
+<span class="go">100          0   {101, 102}         2200.0  1.461501</span>
+<span class="go">101        100           {}          875.0  1.445695</span>
+<span class="go">102        100           {}          525.0  1.439701</span>
+</pre></div>
+</div>
 </dd></dl>
 
+</section>
+
+
+              </div>
+              
+              
+              <!-- Previous / next buttons -->
+<div class='prev-next-area'> 
+    <a class='left-prev' id="prev-link" href="swn.SurfaceWaterNetwork.segments.html" title="previous page">
+        <i class="fas fa-angle-left"></i>
+        <div class="prev-next-info">
+            <p class="prev-next-subtitle">previous</p>
+            <p class="prev-next-title">swn.SurfaceWaterNetwork.segments</p>
+        </div>
+    </a>
+    <a class='right-next' id="next-link" href="swn.SurfaceWaterNetwork.diversions.html" title="next page">
+    <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">swn.SurfaceWaterNetwork.diversions</p>
+    </div>
+    <i class="fas fa-angle-right"></i>
+    </a>
 </div>
-
-
-              </div>
-              
-              
-              <div class='prev-next-bottom'>
-                
-    <a class='left-prev' id="prev-link" href="swn.SurfaceWaterNetwork.segments.html" title="previous page">swn.SurfaceWaterNetwork.segments</a>
-    <a class='right-next' id="next-link" href="swn.SurfaceWaterNetwork.diversions.html" title="next page">swn.SurfaceWaterNetwork.diversions</a>
-
-              </div>
               
           </main>
           
@@ -475,20 +517,19 @@ a matching index to <code class="docutils literal notranslate"><span class="pre"
       </div>
     </div>
   
-  <script src="../_static/js/index.1c5a1a01449ed65a7b51.js"></script>
-
-  <footer class="footer mt-5 mt-md-0">
+  <script src="../_static/js/index.be7d3bbb2ef33a8344ce.js"></script>
+<footer class="footer mt-5 mt-md-0">
   <div class="container">
     
     <div class="footer-item">
       <p class="copyright">
-    &copy; Copyright 2021, Mike Taves, Brioch Hemmings.<br/>
+    &copy; Copyright 2021, Mike Taves, Brioch Hemmings.<br>
 </p>
     </div>
     
     <div class="footer-item">
       <p class="sphinx-version">
-Created using <a href="http://sphinx-doc.org/">Sphinx</a> 4.0.2.<br/>
+Created using <a href="http://sphinx-doc.org/">Sphinx</a> 4.2.0.<br>
 </p>
     </div>
     
