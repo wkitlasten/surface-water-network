@@ -22,6 +22,7 @@
       ~SwnModflow.flopy_segment_data
       ~SwnModflow.from_pickle
       ~SwnModflow.from_swn_flopy
+      ~SwnModflow.get_location_frame_reach_info
       ~SwnModflow.get_outseg_elev
       ~SwnModflow.get_seg_ijk
       ~SwnModflow.get_segment_incision
@@ -34,6 +35,7 @@
       ~SwnModflow.plot_reaches_above
       ~SwnModflow.plot_reaches_vs_model
       ~SwnModflow.reconcile_reach_strtop
+      ~SwnModflow.route_reaches
       ~SwnModflow.set_forward_segs
       ~SwnModflow.set_outseg_elev_for_seg
       ~SwnModflow.set_reach_data_from_array
@@ -56,7 +58,12 @@
 
    .. autosummary::
    
+      ~SwnModflow.diversions
       ~SwnModflow.model
+      ~SwnModflow.reaches
+      ~SwnModflow.segment_data
+      ~SwnModflow.segment_data_ts
+      ~SwnModflow.segments
       ~SwnModflow.swn
    
    
