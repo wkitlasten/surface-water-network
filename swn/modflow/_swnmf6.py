@@ -1345,21 +1345,24 @@ class SwnMf6(SwnModflowBase):
 
     def _fix_dis(self, buffer=0.5):
         botm = self.model.dis.botm.get_data()
+        top = self.model.dis.top.get_data()
         rdf = self.reaches.copy()
 
         rdf['botm0'] = rdf[['i','j']].apply(lambda x: botm[0,x[0],x[1]], axis=1)
         rdf['maxbot'] = rdf[['rtp', 'rbth']].apply(lambda x: x[0] - x[1] - buffer, axis=1)
         rdf['bdz'] = rdf['maxbot'] - rdf['botm0']
-        # shift all layers in model column, TODO: enforce min layer thickness instead?
-        rdf['unq'] = rdf['i']*100000 + rdf['j']
         rdf['rno'] = rdf.index
-        # need to get min bdz for each cell (unique 'unq')
-        rdf = rdf.loc[rdf.bdz <= 0, ['i','j','bdz','unq','rno']].groupby('unq').min()
+        # need to get min bdz for each cell (unique 'ij')
+        rdf['ij'] = rdf[['i','j']].apply(lambda x: (x[0],x[1]), axis=1)
+        rdf = rdf.select_dtypes(include=[np.number, tuple]).groupby(['ij']).min()
         rdf.set_index('rno', inplace=True)
+        # shift all layers in model column, TODO: enforce min layer thickness instead?
         for r in rdf.index:
             botm[:,rdf.loc[r, 'i'], rdf.loc[r, 'j']] = botm[:,rdf.loc[r, 'i'], rdf.loc[r, 'j']] + rdf.loc[r,'bdz']
+            top[rdf.loc[r, 'i'], rdf.loc[r, 'j']] = top[rdf.loc[r, 'i'], rdf.loc[r, 'j']] + rdf.loc[r, 'bdz']
         # may do funny things to flopy external file reference?
         self.model.dis.botm.set_data(botm)
+        self.model.dis.top.set_data(top)
 
 
     def _to_rno_elevs(self, minslope=0.0001, minincise=0.2,
