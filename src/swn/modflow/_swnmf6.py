@@ -62,12 +62,12 @@ class SwnMf6(SwnModflowBase):
 
     @classmethod
     def from_swn_flopy(
-        cls,
-        swn,
-        model,
-        idomain_action="freeze",
-        reach_include_fraction=0.2,
-        diversion_downstream_bias=0.0,
+            cls,
+            swn,
+            model,
+            idomain_action="freeze",
+            reach_include_fraction=0.2,
+            diversion_downstream_bias=0.0,
     ):
         """Create a MODFLOW 6 SFR structure from a surface water network.
 
@@ -95,10 +95,11 @@ class SwnMf6(SwnModflowBase):
         Returns
         -------
         obj : swn.SwnMf6 object
-
         """
         if idomain_action not in ("freeze", "modify"):
             raise ValueError("idomain_action must be one of freeze or modify")
+        if not (-1.0 <= diversion_downstream_bias <= 1.0):
+            raise ValueError("diversion_downstream_bias must be between -1.0 and 1.0")
 
         obj = super().from_swn_flopy(
             swn=swn,
@@ -107,13 +108,11 @@ class SwnMf6(SwnModflowBase):
             reach_include_fraction=reach_include_fraction,
         )
 
-        # Evaluate connections, assume only converging network
+        # Evaluate connections
         to_segnums_d = swn.to_segnums.to_dict()
         has_diversions = obj.diversions is not None
-        if has_diversions:
-            reaches_segnum_s = set(obj.reaches[~obj.reaches.diversion].segnum)
-        else:
-            reaches_segnum_s = set(obj.reaches.segnum)
+        reaches_segnum_s = (
+            set(obj.reaches[~obj.reaches.diversion].segnum) if has_diversions else set(obj.reaches.segnum))
 
         def find_next_ridx(segnum):
             if segnum in to_segnums_d:
@@ -121,47 +120,40 @@ class SwnMf6(SwnModflowBase):
                 if to_segnum in reaches_segnum_s:
                     sel = obj.reaches["segnum"] == to_segnum
                     return obj.reaches[sel].index[0]
-                # recurse downstream
                 return find_next_ridx(to_segnum)
             return 0
-
-        def get_to_ridx():
-            if segnum == next_segnum:
-                return next_ridx
-            return find_next_ridx(segnum)
 
         ridxname = obj.reach_index_name
         to_ridxname = f"to_{ridxname}"
         from_ridxsname = f"from_{ridxname}s"
         obj.reaches[to_ridxname] = -1
-        if has_diversions:
-            from_ridxname = f"from_{ridxname}s"
-            div_to_ridxsname = f"div_to_{ridxname}s"
-            div_from_ridxname = f"div_from_{ridxname}"
-            segnum_iter = obj.reaches.loc[~obj.reaches.diversion, "segnum"].items()
-        else:
-            segnum_iter = obj.reaches["segnum"].items()
+
+        # Process reach connections
+        segnum_iter = obj.reaches[
+            ~obj.reaches.diversion].segnum.items() if has_diversions else obj.reaches.segnum.items()
         ridx, segnum = next(segnum_iter)
         for next_ridx, next_segnum in segnum_iter:
-            obj.reaches.at[ridx, to_ridxname] = get_to_ridx()
+            obj.reaches.at[ridx, to_ridxname] = (
+                next_ridx if segnum == next_segnum else find_next_ridx(segnum))
             ridx, segnum = next_ridx, next_segnum
-        next_segnum = swn.END_SEGNUM
-        obj.reaches.at[ridx, to_ridxname] = get_to_ridx()
+        obj.reaches.at[ridx, to_ridxname] = find_next_ridx(segnum)
+
         if has_diversions:
             obj.reaches.loc[obj.reaches["diversion"], to_ridxname] = 0
         assert obj.reaches[to_ridxname].min() >= 0
 
-        # Populate from_ set
+        # Populate from connections
         obj.reaches[from_ridxsname] = [set() for _ in range(len(obj.reaches))]
         to_ridxs = obj.reaches.loc[obj.reaches[to_ridxname] > 0, to_ridxname]
         for k, v in to_ridxs.items():
             obj.reaches.at[v, from_ridxsname].add(k)
 
-        # Refresh diversions if set
+        # Process diversions if present
         if has_diversions:
             div_sel = obj.diversions["in_model"]
-            # populate (ridx, idv) from their match to non-diversion reaches
             diversions_in_model = obj.diversions[div_sel]
+
+            # Match diversions to reaches
             r_df = obj.get_location_frame_reach_info(
                 diversions_in_model.rename(columns={"from_segnum": "segnum"})[
                     ["segnum", "seg_ndist"]
@@ -169,22 +161,28 @@ class SwnMf6(SwnModflowBase):
                 downstream_bias=diversion_downstream_bias,
                 geom_loc_df=getattr(diversions_in_model, "geometry", None),
             )
-            obj.diversions[ridxname] = 0  # valid from 1
+
+            # Assign reach indices and diversion numbers
+            obj.diversions[ridxname] = 0
             obj.diversions.loc[r_df.index, ridxname] = r_df[ridxname]
-            # evaluate idv, which is between 1 and ndv
             obj.diversions["idv"] = 0
             obj.diversions.loc[div_sel, "idv"] = 1
+
+            # Handle multiple diversions per reach
             ridx_counts = obj.diversions[div_sel].groupby(ridxname).count()["in_model"]
             for ridx, count in ridx_counts[ridx_counts > 1].items():
                 obj.diversions.loc[obj.diversions[ridxname] == ridx, "idv"] = (
-                    obj.diversions.idv[obj.diversions[ridxname] == ridx].cumsum()
-                )
-            # cross-reference iconr to ridx used as a reach
+                    obj.diversions.idv[obj.diversions[ridxname] == ridx].cumsum())
+
+            # Cross-reference with reach data
             diversion_reaches = (
                 obj.reaches.loc[obj.reaches.diversion].reset_index().set_index("divid")
             )
             obj.diversions["iconr"] = diversion_reaches[ridxname]
-            # Also put data into reaches frame
+
+            # Update reach data with diversion info
+            div_from_ridxname = f"div_from_{ridxname}"
+            div_to_ridxsname = f"div_to_{ridxname}s"
             obj.reaches[div_from_ridxname] = 0
             rdiv = (
                 obj.diversions.loc[div_sel, [ridxname, "iconr"]]
@@ -194,48 +192,38 @@ class SwnMf6(SwnModflowBase):
             )
             obj.reaches.loc[rdiv.index, div_from_ridxname] = rdiv[from_ridxname]
             obj.reaches[div_to_ridxsname] = [set() for _ in range(len(obj.reaches))]
-            to_ridxs = obj.reaches.loc[
-                obj.reaches[div_from_ridxname] > 0, div_from_ridxname
-            ]
+            to_ridxs = obj.reaches.loc[obj.reaches[div_from_ridxname] > 0, div_from_ridxname]
             for k, v in to_ridxs.items():
                 obj.reaches.at[v, div_to_ridxsname].add(k)
 
-            # Workaround potential MODFLOW6 bug where diversions cannot attach
-            # to outlet reach, so add another reach
+            # Workaround for MODFLOW6 diversion attachment limitation
             sel = (
-                (obj.reaches[to_ridxname] == 0)
-                & (~obj.reaches["diversion"])
-                & (obj.reaches[div_to_ridxsname].apply(len) > 0)
+                    (obj.reaches[to_ridxname] == 0)
+                    & (~obj.reaches["diversion"])
+                    & (obj.reaches[div_to_ridxsname].apply(len) > 0)
             )
             if sel.any() and "mask" not in obj.reaches.columns:
                 obj.reaches["mask"] = False
-                if swn.has_z:
-                    empty_geom = wkt.loads("linestring z empty")
-                else:
-                    empty_geom = wkt.loads("linestring empty")
+                empty_geom = wkt.loads("linestring z empty") if swn.has_z else wkt.loads("linestring empty")
+
             for ridx in sel[sel].index:
                 new_ridx = len(obj.reaches) + 1
-                # Correction to this reach
                 obj.reaches.loc[ridx, to_ridxname] = new_ridx
-                # Use as template for new reach
                 reach_d = obj.reaches.loc[ridx].to_dict()
-                reach_d.update(
-                    {
-                        "geometry": empty_geom,
-                        "mask": True,
-                        "ireach": reach_d["ireach"] + 1,
-                        to_ridxname: 0,
-                        from_ridxsname: {ridx},
-                        div_to_ridxsname: set(),
-                    }
-                )
+                reach_d.update({
+                    "geometry": empty_geom,
+                    "mask": True,
+                    "ireach": reach_d["ireach"] + 1,
+                    to_ridxname: 0,
+                    from_ridxsname: {ridx},
+                    div_to_ridxsname: set(),
+                })
                 with ignore_shapely_warnings_for_object_array():
                     obj.reaches.loc[new_ridx] = reach_d
 
-        # Set 1.0 for most, 0.0 for head and diversion nodes
+        # Set upstream flow distribution
         obj.reaches["ustrf"] = 1.0
-        zero_from_ridxs = obj.reaches[from_ridxsname].apply(len) == 0
-        obj.reaches.loc[zero_from_ridxs, "ustrf"] = 0.0
+        obj.reaches.loc[obj.reaches[from_ridxsname].apply(len) == 0, "ustrf"] = 0.0
 
         return obj
 
