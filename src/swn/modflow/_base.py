@@ -431,7 +431,8 @@ class SwnModflowBase:
 
     @classmethod
     def from_swn_flopy(
-        cls, swn, model, domain_action="freeze", reach_include_fraction=0.2
+        cls, swn, model, domain_action="freeze", reach_include_fraction=0.2,
+        precision_grid_size=None,
     ):
         """Create a MODFLOW structure from a surface water network.
 
@@ -450,6 +451,21 @@ class SwnModflowBase:
             reaches outside the active grid should be included to a cell.
             Based on the furthest distance of the line and cell geometries.
             Default 0.2 (e.g. for a 100 m grid cell, this is 20 m).
+        precision_grid_size : float, optional
+            If set, segment and grid-cell geometries are snapped to this
+            precision (via ``shapely.set_precision``) before the
+            segment/grid overlay below. On a regular grid, segment
+            vertices/edges can coincide with cell boundaries up to floating-
+            point round-off (e.g. after a CRS reprojection); GEOS's
+            intersection result for an "exactly touching" vs "off by a
+            few ULP" edge case is not guaranteed to resolve the same way on
+            every run, which can make the resulting reach-to-cell
+            assignment non-reproducible for affected segments. Snapping
+            removes that ambiguity at the source. Default ``None`` preserves
+            the original (unsnapped) behaviour. A value a few orders of
+            magnitude finer than the real geometry (e.g. ``1e-3`` for a
+            model with metre-scale coordinates) is fine enough to leave
+            genuine geometry unaffected.
 
         Returns
         -------
@@ -751,13 +767,26 @@ class SwnModflowBase:
 
         # Break down segments into reaches by overlaying grid
         df1 = segments[["geometry"]].assign(segnum=segments.index)
-        if segments.has_sindex and not df1.has_sindex:
-            obj.logger.debug("copying sindex from segments")
-            df1.geometry.values._sindex = segments.geometry.values._sindex
         df2 = grid_cells.reset_index()
-        if grid_cells.has_sindex and not df2.has_sindex:
-            obj.logger.debug("copying sindex from grid_cells")
-            df2.geometry.values._sindex = grid_cells.geometry.values._sindex
+        if precision_grid_size is not None:
+            # New geometry arrays below invalidate any pre-built sindex, so
+            # skip the sindex-reuse optimisation in this branch -- overlay()
+            # builds its own as needed.
+            import shapely as _shapely
+
+            df1["geometry"] = geopandas.GeoSeries(
+                _shapely.set_precision(df1.geometry.values, precision_grid_size),
+                crs=df1.crs, index=df1.index)
+            df2["geometry"] = geopandas.GeoSeries(
+                _shapely.set_precision(df2.geometry.values, precision_grid_size),
+                crs=df2.crs, index=df2.index)
+        else:
+            if segments.has_sindex and not df1.has_sindex:
+                obj.logger.debug("copying sindex from segments")
+                df1.geometry.values._sindex = segments.geometry.values._sindex
+            if grid_cells.has_sindex and not df2.has_sindex:
+                obj.logger.debug("copying sindex from grid_cells")
+                df2.geometry.values._sindex = grid_cells.geometry.values._sindex
         if df1.crs is None and df2.crs is not None:
             df1.crs = df2.crs
         elif df1.crs is not None and df2.crs is None:

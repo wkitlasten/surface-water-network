@@ -63,7 +63,8 @@ class SwnModflow(SwnModflowBase):
 
     @classmethod
     def from_swn_flopy(
-        cls, swn, model, ibound_action="freeze", reach_include_fraction=0.2
+        cls, swn, model, ibound_action="freeze", reach_include_fraction=0.2,
+        precision_grid_size=None,
     ):
         """Create a MODFLOW SFR structure from a surface water network.
 
@@ -82,6 +83,12 @@ class SwnModflow(SwnModflowBase):
             reaches outside the active grid should be included to a cell.
             Based on the furthest distance of the line and cell geometries.
             Default 0.2 (e.g. for a 100 m grid cell, this is 20 m).
+        precision_grid_size : float, optional
+            Snap segment/grid-cell geometry to this precision before the
+            reach-splitting overlay -- see
+            ``SwnModflowBase.from_swn_flopy`` for why this can matter on a
+            regular grid. Default ``None`` preserves the original
+            (unsnapped) behaviour.
 
         Returns
         -------
@@ -127,6 +134,7 @@ class SwnModflow(SwnModflowBase):
             model=model,
             domain_action=ibound_action,
             reach_include_fraction=reach_include_fraction,
+            precision_grid_size=precision_grid_size,
         )
 
     def __repr__(self):

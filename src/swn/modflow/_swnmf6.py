@@ -68,6 +68,7 @@ class SwnMf6(SwnModflowBase):
         idomain_action="freeze",
         reach_include_fraction=0.2,
         diversion_downstream_bias=0.0,
+        precision_grid_size=None,
     ):
         """Create a MODFLOW 6 SFR structure from a surface water network.
 
@@ -91,6 +92,12 @@ class SwnMf6(SwnModflowBase):
             likelihood of finding downstream reaches of a segnum if positive,
             and upstream reaches if negative. Valid range is -1.0 to 1.0.
             Default 0.0 is no bias, matching to the closest reach.
+        precision_grid_size : float, optional
+            Snap segment/grid-cell geometry to this precision before the
+            reach-splitting overlay -- see
+            ``SwnModflowBase.from_swn_flopy`` for why this can matter on a
+            regular grid. Default ``None`` preserves the original
+            (unsnapped) behaviour.
 
         Returns
         -------
@@ -105,6 +112,7 @@ class SwnMf6(SwnModflowBase):
             model=model,
             domain_action=idomain_action,
             reach_include_fraction=reach_include_fraction,
+            precision_grid_size=precision_grid_size,
         )
 
         # Evaluate connections, assume only converging network
